@@ -90,24 +90,10 @@ def render_chart_thread_safe(data, chart_spec):
         # Create a new figure and axes object (thread-safe local state)
         fig, ax = plt.subplots(figsize=(8, 6))
 
-        # Example Spec Handling:
-        # {
-        #   "title": "Air Quality Status",
-        #   "pm25": {"value": 10, "color": "green", "label": "Excellent"},
-        #   "iai": {"value": 1, "color": "blue"},
-        #   "filters": [{"name": "Main", "pct": 100}, {"name": "Pre", "pct": 90}]
-        # }
-
-        # If Gemini returned a structure, use it. Otherwise, plot raw data.
-        # Ideally, we should just plot the data ourselves if we know the schema,
-        # but the task requires using "Nano Banana Pro" (Gemini) to generate the diagram.
-        # So we trust Gemini's visual guidance (colors, labels).
-
         title = chart_spec.get('title', 'Air Quality Status')
         ax.set_title(title, fontsize=16)
 
         # Plotting logic based on spec
-        # Let's assume a Bar Chart for simplicity and clarity as an infographic
         labels = []
         values = []
         colors = []
@@ -123,9 +109,6 @@ def render_chart_thread_safe(data, chart_spec):
         if 'iai' in chart_spec:
             item = chart_spec['iai']
             labels.append(f"IAI: {item.get('value')}")
-            # Scale IAI to be visible? IAI is 1-12. PM2.5 is 0-500.
-            # Maybe use two subplots? Or just normalize?
-            # For simplicity, let's just plot bars.
             values.append(item.get('value', 0))
             colors.append(item.get('color', 'blue'))
 
@@ -179,7 +162,7 @@ async def generate_status_diagram(data):
         prompt = f"""
         You are "Nano Banana Pro", an expert visual designer.
         Analyze this air purifier data: {data}
-        
+
         Return a JSON object specifying how to visualize this status.
         Format:
         {{
@@ -229,6 +212,30 @@ async def send_status_image(bot, chat_id, image_data, caption=None):
         await bot.send_photo(chat_id=chat_id, photo=image_file, caption=caption)
     except Exception as e:
         logging.error(f"Failed to send photo: {e}")
+
+async def mock_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates a status diagram using mock data."""
+    user_msg = "Generating mock status diagram..."
+    await update.message.reply_text(user_msg)
+
+    mock_data = {
+        'name': 'Mock Device',
+        'type': 'AC1234',
+        'pm25': 45,
+        'iaql': 6,
+        'fltsts1': 1000,
+        'flttotal1': 4000,
+        'fltsts0': 200,
+        'flttotal0': 720,
+        'err': 0
+    }
+
+    diagram_data = await generate_status_diagram(mock_data)
+
+    if diagram_data:
+         await send_status_image(context.bot, update.message.chat_id, diagram_data, caption="Mock Status Diagram")
+    else:
+        await update.message.reply_text("Failed to generate mock diagram.")
 
 async def check_air_quality(context: ContextTypes.DEFAULT_TYPE):
     """Periodic job to check air quality and notify on change."""
@@ -322,9 +329,11 @@ if __name__ == '__main__':
         logging.error("JobQueue not available! Please install 'python-telegram-bot[job-queue]'.")
 
     start_handler = CommandHandler('status', status)
+    mock_handler = CommandHandler('mockstatus', mock_status)
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     
     application.add_handler(start_handler)
+    application.add_handler(mock_handler)
     application.add_handler(message_handler)
     
     print("Bot is running...")
