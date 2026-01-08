@@ -8,6 +8,7 @@ import shutil
 import ast
 import json
 import google.generativeai as genai
+import google.api_core.exceptions
 import io
 import matplotlib.pyplot as plt
 import matplotlib
@@ -144,8 +145,9 @@ def render_chart_thread_safe(data, chart_spec):
 
 async def generate_status_diagram(data):
     """
-    Generates a status diagram using Gemini to determine the visualization content,
-    then renders it safely using Matplotlib in a thread.
+    Generates a status diagram using Gemini.
+    It attempts to use `gemini-3-pro-image` first (user requested), checking for direct image output.
+    If that fails or returns text, it falls back to parsing JSON and rendering via Matplotlib.
     """
     try:
         gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -153,11 +155,10 @@ async def generate_status_diagram(data):
             logging.error("GEMINI_API_KEY not set.")
             return None
 
-        # Use simple configuration, assuming it handles single calls well.
         genai.configure(api_key=gemini_api_key)
 
-        # Using gemini-1.5-flash
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # User requested `gemini-3-pro-image`
+        models_to_try = ["gemini-3-pro-image", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
 
         prompt = f"""
         You are "Nano Banana Pro", an expert visual designer.
@@ -179,10 +180,39 @@ async def generate_status_diagram(data):
         - PM2.5 Color: Green (<12), Yellow (<35), Orange (<55), Red (>55)
         - Filter Pct: Calculate from fltsts1/flttotal1 (Main) and fltsts0/flttotal0 (Pre).
 
-        Return ONLY valid JSON.
+        If you are an image generation model, generate the image directly.
+        Otherwise, return ONLY valid JSON.
         """
 
-        response = await model.generate_content_async(prompt)
+        response = None
+        used_model = None
+
+        for model_name in models_to_try:
+            try:
+                logging.info(f"Attempting to generate with model: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                response = await model.generate_content_async(prompt)
+                used_model = model_name
+                logging.info(f"Success with model: {model_name}")
+                break
+            except google.api_core.exceptions.NotFound:
+                logging.warning(f"Model {model_name} not found or not supported. Trying next...")
+            except Exception as e:
+                logging.error(f"Error with model {model_name}: {e}")
+                # Continue to fallback
+
+        if not response:
+            logging.error("All models failed to generate content.")
+            return None
+
+        # Check for inline image data (e.g. from gemini-3-pro-image if it acts as an image model)
+        if hasattr(response, 'parts'):
+            for part in response.parts:
+                if part.inline_data:
+                     logging.info(f"Received inline image data from model {used_model}")
+                     return part.inline_data.data
+
+        # Fallback to Text -> JSON -> Matplotlib
         text = response.text
 
         # Clean markdown
@@ -191,7 +221,7 @@ async def generate_status_diagram(data):
         try:
             chart_spec = json.loads(text)
         except json.JSONDecodeError:
-            logging.error(f"Failed to parse Gemini JSON: {text}")
+            logging.error(f"Failed to parse Gemini JSON from {used_model}: {text}")
             return None
 
         # Render in thread
