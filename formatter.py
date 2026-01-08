@@ -1,9 +1,24 @@
 import ast
 import html
+import re
 
 def format_status(output_str):
+    # Attempt to extract the dictionary part if the string contains extra data
+    # We look for the first '{' and the last '}'
     try:
-        data = ast.literal_eval(output_str)
+        # Pre-processing: try to find the dict boundaries
+        # This handles cases like:
+        # "Some log info\n{'key': 'value'}\nMore log info"
+        start = output_str.find('{')
+        end = output_str.rfind('}')
+        
+        if start != -1 and end != -1 and end > start:
+            potential_dict = output_str[start:end+1]
+            data = ast.literal_eval(potential_dict)
+        else:
+            # Fallback to original behavior if no braces found
+            data = ast.literal_eval(output_str)
+
     except (ValueError, SyntaxError) as e:
         # Escape the error message as it might contain < > from the exception
         return f"Error parsing output: {html.escape(str(e))}"
