@@ -1,3 +1,8 @@
 python-telegram-bot[job-queue]
 google-generativeai
 matplotlib
+fastapi
+uvicorn
+jinja2
+python-multipart
+httpx

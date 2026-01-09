@@ -145,9 +145,9 @@ def render_chart_thread_safe(data, chart_spec):
 
 async def generate_status_diagram(data):
     """
-    Generates a status diagram using Gemini.
-    It attempts to use `gemini-3-pro-image` first (user requested), checking for direct image output.
-    If that fails or returns text, it falls back to parsing JSON and rendering via Matplotlib.
+    Generates a status diagram using Gemini to determine the visualization content,
+    then renders it safely using Matplotlib in a thread.
+    Implements fallback to older/standard models if the preferred one is not found.
     """
     try:
         gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -157,7 +157,7 @@ async def generate_status_diagram(data):
 
         genai.configure(api_key=gemini_api_key)
 
-        # User requested `gemini-3-pro-image`
+        # List of models to try in order of preference
         models_to_try = ["gemini-3-pro-image", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
 
         prompt = f"""
@@ -205,7 +205,7 @@ async def generate_status_diagram(data):
             logging.error("All models failed to generate content.")
             return None
 
-        # Check for inline image data (e.g. from gemini-3-pro-image if it acts as an image model)
+        # Check for inline image data (e.g. from gemini-3-pro-image)
         if hasattr(response, 'parts'):
             for part in response.parts:
                 if part.inline_data:

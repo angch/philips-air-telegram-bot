@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Purifier Status</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        h1 { color: #333; }
+        .data-box { background: #f4f4f4; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Air Purifier Status</h1>
+
+    {% if error %}
+        <div class="error">Error: {{ error }}</div>
+    {% else %}
+        <div class="data-box">
+            <h2>Current Metrics</h2>
+            <ul>
+                <li><strong>Name:</strong> {{ data.name }}</li>
+                <li><strong>Type:</strong> {{ data.type }}</li>
+                <li><strong>PM2.5:</strong> {{ data.pm25 }}</li>
+                <li><strong>IAI:</strong> {{ data.iaql }}</li>
+                <li><strong>Main Filter:</strong> {{ data.fltsts1 }} / {{ data.flttotal1 }}</li>
+                <li><strong>Pre-Filter:</strong> {{ data.fltsts0 }} / {{ data.flttotal0 }}</li>
+                <li><strong>Error Code:</strong> {{ data.err }}</li>
+            </ul>
+        </div>
+
+        {% if image_b64 %}
+            <div class="diagram-box">
+                <h2>Visualization</h2>
+                <img src="data:image/png;base64,{{ image_b64 }}" alt="Status Diagram">
+            </div>
+        {% else %}
+            <p>No visualization generated.</p>
+        {% endif %}
+    {% endif %}
+
+    <p><a href="/">Refresh</a> | <a href="/mock">View Mock Data</a></p>
+</body>
+</html>
